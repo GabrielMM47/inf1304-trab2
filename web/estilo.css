@@ -1,0 +1,28 @@
+:root{--papel:#f6efe0;--cartao:#fffaf0;--tinta:#2b2118;--suave:#6b5b4b;--marca:#8a3b12;--linha:#dccdb0;--ok:#2f6b3a;--erro:#a12a1f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--papel);color:var(--tinta);font:16px/1.5 Georgia,"Times New Roman",serif}
+header{background:var(--marca);color:#fff7e8;padding:.8rem 1rem;display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;align-items:baseline;justify-content:space-between}
+header h1{margin:0;font-size:1.4rem;letter-spacing:.02em}
+nav a{color:#fff7e8;font-size:.9rem;text-decoration:underline}
+main{max-width:52rem;margin:0 auto;padding:1rem}
+section{background:var(--cartao);border:1px solid var(--linha);border-radius:6px;padding:1rem;margin-bottom:1rem}
+h2{margin:0 0 .6rem;font-size:1.2rem;color:var(--marca)}
+label{display:block;font-size:.9rem;color:var(--suave);margin:.5rem 0 .2rem}
+input,select{width:100%;padding:.5rem;font:inherit;border:1px solid var(--linha);border-radius:4px;background:#fff}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--marca);outline-offset:1px}
+button{font:inherit;padding:.45rem .9rem;border:0;border-radius:4px;background:var(--marca);color:#fff;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.sec{background:transparent;color:var(--marca);border:1px solid var(--marca)}
+form button{margin-top:.8rem}
+.tabela{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:.5rem .4rem;border-bottom:1px solid var(--linha);vertical-align:middle}
+th{font-size:.85rem;color:var(--suave)}
+td.acao{white-space:nowrap}
+td.acao input{width:5rem;margin-right:.4rem;padding:.35rem}
+.tag{font-size:.85rem;padding:.1rem .5rem;border-radius:99px;border:1px solid}
+.tag.sim{color:var(--ok)}.tag.nao{color:var(--erro)}
+.msg{min-height:1.4rem;margin:.6rem 0 0;font-weight:bold}
+.msg.ok{color:var(--ok)}.msg.erro{color:var(--erro)}
+.linha{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+@media (max-width:30rem){th,td{font-size:.9rem;padding:.4rem .25rem}td.acao input{width:4rem}}
