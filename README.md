@@ -126,13 +126,35 @@ Reservas já criadas mantêm o `expiraEm` que tinham; a mudança vale para as re
 O script `scripts/teste_concorrencia.py` dispara vários pedidos de interesse ao mesmo tempo para um mesmo livro e conta o resultado:
 
 ```bash
-API=$(aws cloudformation describe-stacks --stack-name sebo \
+API=$(aws cloudformation describe-stacks --stack-name "${STACK:-sebo}" \
   --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
 curl -s "$API/livros"   # anote o livroId de um livro com quantidade = 1
 python3 scripts/teste_concorrencia.py "$API" <livroId> 20
 ```
 
 Argumentos: `<api_url> <livroId> <n> [copias]`. Com `n` pedidos simultâneos (e-mails `cliente1@teste.com` a `clienteN@teste.com`) e `copias` exemplares (padrão 1), o resultado esperado é exatamente `copias` pedidos `RESERVADO`, e os demais `PENDENTE`. O script imprime a contagem por status e sai com código 1 se o número de `RESERVADO` for diferente. Use um livro novo a cada execução: e-mails que já têm interesse pendente ou reservado no mesmo livro são recusados (409) e contados como `erro`.
+
+### Teste de ponta a ponta na AWS
+
+O script `scripts/teste_e2e.py` percorre o fluxo completo contra a stack implantada: reserva com estoque, entrada na fila, interesse duplicado (409), chegada de exemplar (o stream reserva para o primeiro da fila), venda no balcão, expiração da reserva de quem não veio e passagem do exemplar para o próximo da fila. Para conferir os e-mails sem depender de uma caixa de entrada real, ele inscreve no tópico duas filas SQS temporárias: uma sem filtro (recebe tudo) e outra com a filter policy de um cliente (prova que cada cliente só recebe as próprias mensagens). As filas e inscrições são apagadas ao final.
+
+```bash
+. .venv/bin/activate
+python scripts/teste_e2e.py     # cerca de 4 minutos (prazo de 2 min + varredura de 1 min)
+```
+
+Cada verificação aparece como `[OK ]` ou `[FALHOU]`, seguida da lista de e-mails publicados; o script sai com código 1 se algo falhar. Ele cria um livro de teste por execução.
+
+## Pausar quando não estiver usando
+
+A única parte do sistema que roda sozinha é a regra do EventBridge que varre reservas vencidas a cada minuto. Todo o resto (Lambdas da API, API Gateway, DynamoDB sob demanda, SNS, S3) só gera custo quando é usado. Para não deixar nada executando entre os testes, sem apagar a implementação:
+
+```bash
+./scripts/pausar.sh     # desliga a varredura de expiração
+./scripts/retomar.sh    # religa antes de testar ou apresentar
+```
+
+Enquanto pausado, reservas vencidas não expiram; ao retomar, elas expiram na primeira varredura e os exemplares passam para os próximos da fila.
 
 ## Testes locais
 
@@ -162,7 +184,8 @@ tests/                      testes com pytest e moto
 web/                        páginas do comprador e do funcionário (HTML + JS puro)
 infra/template.yaml         stack CloudFormation
 deploy.sh  destroy.sh       implantação e remoção
-scripts/                    popular.sh, inscrever_cliente.sh, teste_concorrencia.py, empacotar.py
+scripts/                    popular.sh, inscrever_cliente.sh, teste_concorrencia.py, teste_e2e.py,
+                            pausar.sh, retomar.sh, empacotar.py
 docs/design.md              documento de design
 ```
 
