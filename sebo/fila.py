@@ -1,10 +1,14 @@
+import re
 from datetime import datetime
+from uuid import uuid4
 
 from sebo import livros
+from sebo.erros import DadosInvalidos, InteresseDuplicado
 from sebo.notificacao import Notificador
 from sebo.tempo import de_iso, iso
 
 MAX_ITERACOES = 100
+PADRAO_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def reservar(ctx, livro_id: str, ordem: str, agora: datetime) -> bool:
@@ -93,3 +97,66 @@ def alocar(ctx, livro_id: str, agora: datetime) -> list[dict]:
             )
             reservados.append(proximo)
     return reservados
+
+
+def posicao_na_fila(ctx, livro_id: str, ordem: str) -> int:
+    return 1 + sum(1 for i in pendentes(ctx, livro_id) if i["ordem"] < ordem)
+
+
+def _ja_ativo(ctx, livro_id: str, email: str) -> bool:
+    kwargs = {
+        "TableName": ctx.tabela_interesses,
+        "KeyConditionExpression": "livroId = :l",
+        "FilterExpression": "email = :e AND #s IN (:p, :r)",
+        "ExpressionAttributeNames": {"#s": "status"},
+        "ExpressionAttributeValues": {
+            ":l": {"S": livro_id},
+            ":e": {"S": email},
+            ":p": {"S": "PENDENTE"},
+            ":r": {"S": "RESERVADO"},
+        },
+        "ConsistentRead": True,
+    }
+    while True:
+        resp = ctx.dynamodb.query(**kwargs)
+        if resp["Items"]:
+            return True
+        if "LastEvaluatedKey" not in resp:
+            return False
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def registrar_interesse(ctx, livro_id: str, email: str, agora: datetime) -> dict:
+    email = (email or "").strip().lower()
+    if not PADRAO_EMAIL.match(email):
+        raise DadosInvalidos("e-mail inválido")
+    livro = livros.obter(ctx, livro_id)
+    if _ja_ativo(ctx, livro_id, email):
+        raise InteresseDuplicado("já existe interesse ativo deste e-mail para o livro")
+
+    ordem = f"{iso(agora)}#{uuid4().hex}"
+    ctx.dynamodb.put_item(
+        TableName=ctx.tabela_interesses,
+        Item={
+            "livroId": {"S": livro_id},
+            "ordem": {"S": ordem},
+            "email": {"S": email},
+            "status": {"S": "PENDENTE"},
+            "criadoEm": {"S": iso(agora)},
+        },
+        ConditionExpression="attribute_not_exists(ordem)",
+    )
+    alocar(ctx, livro_id, agora)
+
+    item = _para_dict(
+        ctx.dynamodb.get_item(
+            TableName=ctx.tabela_interesses,
+            Key={"livroId": {"S": livro_id}, "ordem": {"S": ordem}},
+            ConsistentRead=True,
+        )["Item"]
+    )
+    if item["status"] == "RESERVADO":
+        return {"ordem": ordem, "status": "RESERVADO", "expiraEm": item["expiraEm"]}
+    posicao = posicao_na_fila(ctx, livro_id, ordem)
+    Notificador(ctx).na_fila(email, livro["titulo"], posicao)
+    return {"ordem": ordem, "status": "PENDENTE", "posicaoFila": posicao}
