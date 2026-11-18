@@ -1,0 +1,381 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Sebo na Nuvem - reservas de livros usados (AWS Academy Learner Lab, us-east-1)
+
+Parameters:
+  PrazoReservaMinutos:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    Description: Minutos que uma reserva fica ativa antes de expirar (2 para a demonstração; 2880 = 48 h)
+  PacoteS3Bucket:
+    Type: String
+    Description: Bucket de artefatos com o zip das Lambdas (criado pelo deploy.sh)
+  PacoteS3Key:
+    Type: String
+    Description: Chave do zip das Lambdas no bucket de artefatos (pacote-<hash>.zip)
+
+Resources:
+  TabelaLivros:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-Livros
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: livroId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: livroId
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  TabelaInteresses:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-Interesses
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: livroId
+          AttributeType: S
+        - AttributeName: ordem
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: expiraEm
+          AttributeType: S
+      KeySchema:
+        - AttributeName: livroId
+          KeyType: HASH
+        - AttributeName: ordem
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: status-expiraEm
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: expiraEm
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  TabelaVendas:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-Vendas
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: vendaId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: vendaId
+          KeyType: HASH
+
+  Topico:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: sebo-notificacoes
+
+  ListarLivros:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-listar_livros
+      Runtime: python3.12
+      Handler: lambdas.listar_livros.handler.lambda_handler
+      Timeout: 30
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
+      Code:
+        S3Bucket: !Ref PacoteS3Bucket
+        S3Key: !Ref PacoteS3Key
+      Environment:
+        Variables:
+          TABELA_LIVROS: !Ref TabelaLivros
+          TABELA_INTERESSES: !Ref TabelaInteresses
+          TABELA_VENDAS: !Ref TabelaVendas
+          TOPICO_SNS: !Ref Topico
+          PRAZO_RESERVA_MINUTOS: !Ref PrazoReservaMinutos
+
+  GerenciarEstoque:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-gerenciar_estoque
+      Runtime: python3.12
+      Handler: lambdas.gerenciar_estoque.handler.lambda_handler
+      Timeout: 30
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
+      Code:
+        S3Bucket: !Ref PacoteS3Bucket
+        S3Key: !Ref PacoteS3Key
+      Environment:
+        Variables:
+          TABELA_LIVROS: !Ref TabelaLivros
+          TABELA_INTERESSES: !Ref TabelaInteresses
+          TABELA_VENDAS: !Ref TabelaVendas
+          TOPICO_SNS: !Ref Topico
+          PRAZO_RESERVA_MINUTOS: !Ref PrazoReservaMinutos
+
+  RegistrarInteresse:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-registrar_interesse
+      Runtime: python3.12
+      Handler: lambdas.registrar_interesse.handler.lambda_handler
+      Timeout: 30
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
+      Code:
+        S3Bucket: !Ref PacoteS3Bucket
+        S3Key: !Ref PacoteS3Key
+      Environment:
+        Variables:
+          TABELA_LIVROS: !Ref TabelaLivros
+          TABELA_INTERESSES: !Ref TabelaInteresses
+          TABELA_VENDAS: !Ref TabelaVendas
+          TOPICO_SNS: !Ref Topico
+          PRAZO_RESERVA_MINUTOS: !Ref PrazoReservaMinutos
+
+  AlocarReservas:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-alocar_reservas
+      Runtime: python3.12
+      Handler: lambdas.alocar_reservas.handler.lambda_handler
+      Timeout: 30
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
+      Code:
+        S3Bucket: !Ref PacoteS3Bucket
+        S3Key: !Ref PacoteS3Key
+      Environment:
+        Variables:
+          TABELA_LIVROS: !Ref TabelaLivros
+          TABELA_INTERESSES: !Ref TabelaInteresses
+          TABELA_VENDAS: !Ref TabelaVendas
+          TOPICO_SNS: !Ref Topico
+          PRAZO_RESERVA_MINUTOS: !Ref PrazoReservaMinutos
+
+  ExpirarReservas:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-expirar_reservas
+      Runtime: python3.12
+      Handler: lambdas.expirar_reservas.handler.lambda_handler
+      Timeout: 30
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
+      Code:
+        S3Bucket: !Ref PacoteS3Bucket
+        S3Key: !Ref PacoteS3Key
+      Environment:
+        Variables:
+          TABELA_LIVROS: !Ref TabelaLivros
+          TABELA_INTERESSES: !Ref TabelaInteresses
+          TABELA_VENDAS: !Ref TabelaVendas
+          TOPICO_SNS: !Ref Topico
+          PRAZO_RESERVA_MINUTOS: !Ref PrazoReservaMinutos
+
+  RegistrarVenda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-registrar_venda
+      Runtime: python3.12
+      Handler: lambdas.registrar_venda.handler.lambda_handler
+      Timeout: 30
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
+      Code:
+        S3Bucket: !Ref PacoteS3Bucket
+        S3Key: !Ref PacoteS3Key
+      Environment:
+        Variables:
+          TABELA_LIVROS: !Ref TabelaLivros
+          TABELA_INTERESSES: !Ref TabelaInteresses
+          TABELA_VENDAS: !Ref TabelaVendas
+          TOPICO_SNS: !Ref Topico
+          PRAZO_RESERVA_MINUTOS: !Ref PrazoReservaMinutos
+
+  Api:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub ${AWS::StackName}-api
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+        AllowHeaders:
+          - content-type
+
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref Api
+      StageName: $default
+      AutoDeploy: true
+
+  IntegracaoListarLivros:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Api
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ListarLivros.Arn
+      PayloadFormatVersion: "2.0"
+
+  PermissaoListarLivros:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ListarLivros
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*
+
+  RotaGetLivros:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Api
+      RouteKey: GET /livros
+      Target: !Sub integrations/${IntegracaoListarLivros}
+
+  IntegracaoGerenciarEstoque:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Api
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt GerenciarEstoque.Arn
+      PayloadFormatVersion: "2.0"
+
+  PermissaoGerenciarEstoque:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref GerenciarEstoque
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*
+
+  RotaPostLivros:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Api
+      RouteKey: POST /livros
+      Target: !Sub integrations/${IntegracaoGerenciarEstoque}
+
+  RotaPostChegada:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Api
+      RouteKey: POST /livros/{id}/chegada
+      Target: !Sub integrations/${IntegracaoGerenciarEstoque}
+
+  IntegracaoRegistrarInteresse:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Api
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt RegistrarInteresse.Arn
+      PayloadFormatVersion: "2.0"
+
+  PermissaoRegistrarInteresse:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref RegistrarInteresse
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*
+
+  RotaPostInteresses:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Api
+      RouteKey: POST /interesses
+      Target: !Sub integrations/${IntegracaoRegistrarInteresse}
+
+  IntegracaoRegistrarVenda:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Api
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt RegistrarVenda.Arn
+      PayloadFormatVersion: "2.0"
+
+  PermissaoRegistrarVenda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref RegistrarVenda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*
+
+  RotaGetReservas:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Api
+      RouteKey: GET /reservas
+      Target: !Sub integrations/${IntegracaoRegistrarVenda}
+
+  RotaPostVendas:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Api
+      RouteKey: POST /vendas
+      Target: !Sub integrations/${IntegracaoRegistrarVenda}
+
+  StreamLivrosParaAlocar:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt TabelaLivros.StreamArn
+      FunctionName: !Ref AlocarReservas
+      StartingPosition: LATEST
+      MaximumRetryAttempts: 3
+
+  RegraExpiracao:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Varre reservas vencidas a cada minuto
+      ScheduleExpression: rate(1 minute)
+      State: ENABLED
+      Targets:
+        - Id: expirar-reservas
+          Arn: !GetAtt ExpirarReservas.Arn
+
+  PermissaoRegraExpiracao:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ExpirarReservas
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt RegraExpiracao.Arn
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: comprador.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: LeituraPublica
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub ${SiteBucket.Arn}/*
+
+Outputs:
+  ApiUrl:
+    Description: URL base da API HTTP
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com
+  SiteUrl:
+    Description: URL do site estático
+    Value: !GetAtt SiteBucket.WebsiteURL
+  SiteBucket:
+    Description: Bucket do site estático
+    Value: !Ref SiteBucket
+  TopicoArn:
+    Description: ARN do tópico SNS de notificações
+    Value: !Ref Topico
