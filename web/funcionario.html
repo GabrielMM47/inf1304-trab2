@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sebo — Funcionário</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;700&display=swap">
+<link rel="stylesheet" href="estilo.css">
+<script src="config.js"></script>
+<script src="app.js" defer></script>
+</head>
+<body data-pagina="funcionario">
+<header><h1>Sebo — Funcionário</h1><nav><a href="comprador.html">Área do comprador</a></nav></header>
+<main>
+<section>
+<h2>Cadastrar livro</h2>
+<form id="form-livro">
+<label for="titulo">Título</label><input id="titulo" name="titulo" required>
+<label for="autor">Autor</label><input id="autor" name="autor" required>
+<label for="preco">Preço (R$)</label><input id="preco" name="preco" inputmode="decimal" required>
+<label for="quantidade">Quantidade</label><input id="quantidade" name="quantidade" type="number" min="0" step="1" value="1" required>
+<button type="submit">Cadastrar</button>
+</form>
+<p id="msg-cadastro" class="msg" role="status" aria-live="polite"></p>
+</section>
+<section>
+<div class="linha"><h2>Catálogo</h2><button id="atualizar" type="button" class="sec">Atualizar</button></div>
+<div class="tabela"><table>
+<thead><tr><th>Título</th><th>Autor</th><th>Disp. / total</th><th></th></tr></thead>
+<tbody id="catalogo"></tbody>
+</table></div>
+<p id="msg-catalogo" class="msg" role="status" aria-live="polite"></p>
+</section>
+<section>
+<h2>Reservas ativas</h2>
+<label for="livro-reservas">Livro</label>
+<select id="livro-reservas"></select>
+<div class="tabela"><table>
+<thead><tr><th>E-mail</th><th>Reservado</th><th>Expira</th><th></th></tr></thead>
+<tbody id="reservas"></tbody>
+</table></div>
+<p id="msg-reservas" class="msg" role="status" aria-live="polite"></p>
+</section>
+</main>
+</body>
+</html>

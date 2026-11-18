@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sebo — Comprador</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;700&display=swap">
+<link rel="stylesheet" href="estilo.css">
+<script src="config.js"></script>
+<script src="app.js" defer></script>
+</head>
+<body data-pagina="comprador">
+<header><h1>Sebo</h1><nav><a href="funcionario.html">Área do funcionário</a></nav></header>
+<main>
+<section>
+<h2>Seu e-mail</h2>
+<label for="email">E-mail para receber o aviso da reserva</label>
+<input id="email" type="email" autocomplete="email" placeholder="voce@exemplo.com">
+<p id="mensagem" class="msg" role="status" aria-live="polite"></p>
+</section>
+<section>
+<div class="linha"><h2>Catálogo</h2><button id="atualizar" type="button" class="sec">Atualizar</button></div>
+<div class="tabela"><table>
+<thead><tr><th>Título</th><th>Autor</th><th>Preço</th><th>Estoque</th><th></th></tr></thead>
+<tbody id="catalogo"></tbody>
+</table></div>
+</section>
+</main>
+</body>
+</html>
