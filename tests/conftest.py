@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from datetime import timedelta
+from uuid import uuid4
 from pathlib import Path
 
 import boto3
@@ -8,6 +9,7 @@ import pytest
 from moto import mock_aws
 
 from sebo.contexto import Contexto
+from sebo.tempo import iso
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -117,3 +119,18 @@ def emails(ctx):
                 sqs.delete_message(QueueUrl=url, ReceiptHandle=m["ReceiptHandle"])
 
     return drenar
+
+
+def inserir_pendente(ctx, livro_id: str, email: str, agora) -> str:
+    ordem = f"{iso(agora)}#{uuid4().hex}"
+    ctx.dynamodb.put_item(
+        TableName=ctx.tabela_interesses,
+        Item={
+            "livroId": {"S": livro_id},
+            "ordem": {"S": ordem},
+            "email": {"S": email},
+            "status": {"S": "PENDENTE"},
+            "criadoEm": {"S": iso(agora)},
+        },
+    )
+    return ordem
