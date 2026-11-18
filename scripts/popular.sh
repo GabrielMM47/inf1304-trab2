@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Carrega 5 livros de exemplo pela API (POST /livros).
 # Uso: scripts/popular.sh   (variável opcional: STACK)
+# Atenção: rodar de novo cadastra os livros outra vez (duplicados, com novos livroId).
 set -euo pipefail
 
 REGION=us-east-1
@@ -12,7 +13,7 @@ API_URL=$(aws cloudformation describe-stacks --stack-name "$STACK" \
 
 livro() {
   echo "Cadastrando: $1"
-  curl -fsS -X POST "${API_URL}/livros" \
+  curl --fail-with-body -sS -X POST "${API_URL}/livros" \
     -H "content-type: application/json" \
     -d "{\"titulo\": \"$1\", \"autor\": \"$2\", \"preco\": $3, \"quantidade\": $4}"
   echo

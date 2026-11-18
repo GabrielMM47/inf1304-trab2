@@ -2,3 +2,4 @@ moto[dynamodb,sns,sqs]
 pytest
 boto3
 cfn-lint
+pyyaml

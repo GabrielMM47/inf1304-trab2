@@ -29,6 +29,15 @@ if ! aws s3api head-object --bucket "$ARTEFATOS" --key "$CHAVE" >/dev/null 2>&1;
   aws s3 cp build/pacote.zip "s3://${ARTEFATOS}/${CHAVE}"
 fi
 
+ESTADO=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+  --query "Stacks[0].StackStatus" --output text 2>/dev/null || true)
+if [ "$ESTADO" = "ROLLBACK_COMPLETE" ] || [ "$ESTADO" = "ROLLBACK_FAILED" ]; then
+  echo "AVISO: a stack $STACK está em $ESTADO porque a primeira implantação falhou." >&2
+  echo "Uma stack nesse estado não pode ser atualizada; apagando-a antes de implantar de novo..." >&2
+  aws cloudformation delete-stack --stack-name "$STACK"
+  aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+fi
+
 echo "Implantando a stack $STACK..."
 aws cloudformation deploy \
   --stack-name "$STACK" \
@@ -54,7 +63,7 @@ printf 'window.SEBO_API = "%s";\n' "$API_URL" > build/config.js
 
 if [ -d web ]; then
   echo "Publicando o site em s3://${SITE_BUCKET}/..."
-  aws s3 sync web/ "s3://${SITE_BUCKET}/" --delete
+  aws s3 sync web/ "s3://${SITE_BUCKET}/" --delete --exclude config.js
   aws s3 cp build/config.js "s3://${SITE_BUCKET}/config.js" --content-type application/javascript
 else
   echo "AVISO: diretório web/ não encontrado; site não publicado (build/config.js foi gerado mesmo assim)." >&2
